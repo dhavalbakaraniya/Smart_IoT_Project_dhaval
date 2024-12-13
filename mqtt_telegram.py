@@ -47,6 +47,10 @@ async def send_telegram_message(message):
     except Exception as e:
         print(f"Error sending message to Telegram: {e}")
 
+# Wrapper function to schedule tasks in the event loop
+def schedule_task(coro):
+    asyncio.run_coroutine_threadsafe(coro, event_loop)
+
 
 # Create a persistent event loop
 event_loop = asyncio.new_event_loop()
