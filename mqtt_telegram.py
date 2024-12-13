@@ -11,10 +11,14 @@ MQTT_TOPIC = "dar_val"
 TELEGRAM_TOKEN = "7383173396:AAFWK3sSGfNM8TaIGce7-L17bg8HTF4glb0"
 TELEGRAM_CHAT_ID = None  # Dynamically fetched later
 
-flag = 0  # Alert flag to prevent repeated messages
+flag = 0
 
 # Initialize Telegram Bot
 bot = Bot(token=TELEGRAM_TOKEN)
+
+# Create a persistent event loop
+event_loop = asyncio.new_event_loop()
+asyncio.set_event_loop(event_loop)
 
 # Function to dynamically fetch the chat ID
 def get_chat_id():
@@ -39,6 +43,7 @@ TELEGRAM_CHAT_ID = get_chat_id()
 if TELEGRAM_CHAT_ID is None:
     print("Failed to fetch Telegram chat ID. Exiting...")
     exit(1)
+
 # Asynchronous function to send a Telegram message
 async def send_telegram_message(message):
     try:
@@ -69,16 +74,22 @@ def on_message(client, userdata, msg):
         # Check humidity threshold and send a notification
         if humidity < 300:
             if flag == 0:
-                flag = 1  # Set flag to prevent duplicate alerts
-                message = f"Alert! Low humidity detected: {humidity}"
+                
+                flag = 1
+                message = f"Alert! Low humidity detected"
                 schedule_task(send_telegram_message(message))
-        else:
-            flag = 0  # Reset flag when humidity is back to normal
+            
+            else:
+                flag = 0  # Example threshold
+            # if flag is 0:
+                  # Schedule the async function
+                # flag = 1
+        # else:
+        #     flag = 0
     except Exception as e:
         print(f"Error processing message: {e}")
 
-
-# Create a persistent event loop
+# MQTT Client Setup
 client = mqtt.Client(protocol=mqtt.MQTTv311)  # Use explicit protocol version
 client.on_connect = on_connect
 client.on_message = on_message
@@ -87,3 +98,6 @@ client.on_message = on_message
 loop_thread = threading.Thread(target=event_loop.run_forever, daemon=True)
 loop_thread.start()
 
+# Connect to the MQTT broker and start listening
+client.connect(MQTT_BROKER, MQTT_PORT, 60)
+client.loop_forever()
