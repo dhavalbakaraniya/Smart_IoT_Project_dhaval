@@ -17,10 +17,11 @@ BROKER = "test.mosquitto.org"
 TOPIC = "dar_val"
 
 def on_message(client, userdata, message):
+    """Callback for MQTT message reception"""
     global latest_moisture_value
     latest_moisture_value = message.payload.decode()
 
-    # Convert to float instead of int for handling decimal values
+    # Check if moisture value is low and log the event
     if float(latest_moisture_value) <= 300:
         log_entry = {
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -29,6 +30,7 @@ def on_message(client, userdata, message):
         low_humidity_log.append(log_entry)
 
 def mqtt_subscribe():
+    """Subscribe to MQTT topic in a separate thread"""
     client = mqtt.Client()
     client.on_message = on_message
     client.connect(BROKER, 1883, 60)
@@ -42,14 +44,17 @@ mqtt_thread.start()
 
 @app.get("/humidity")
 def read_humidity():
+    """Endpoint to retrieve the latest moisture value"""
     return {"moisture_value": latest_moisture_value}
 
 @app.get("/low_humidity_log")
 def get_low_humidity_log():
+    """Endpoint to retrieve the log of low humidity detections"""
     return {"low_humidity_log": low_humidity_log}
 
 # Serve the index.html file
 @app.get("/", response_class=HTMLResponse)
 def get_index():
+    """Serve the main HTML page"""
     with open("templates/index.html", "r") as file:
         return HTMLResponse(content=file.read())
