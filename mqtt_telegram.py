@@ -51,6 +51,32 @@ async def send_telegram_message(message):
 def schedule_task(coro):
     asyncio.run_coroutine_threadsafe(coro, event_loop)
 
+# MQTT Callback functions
+def on_connect(client, userdata, flags, rc):
+    if rc == 0:
+        print("Connected to MQTT Broker!")
+        client.subscribe(MQTT_TOPIC)
+    else:
+        print(f"Failed to connect, return code {rc}")
+
+def on_message(client, userdata, msg):
+    try:
+        global flag
+        # Parse the message payload
+        humidity = float(msg.payload.decode())
+        print(f"Received Humidity: {humidity}")
+
+        # Check humidity threshold and send a notification
+        if humidity < 300:
+            if flag == 0:
+                flag = 1  # Set flag to prevent duplicate alerts
+                message = f"Alert! Low humidity detected: {humidity}"
+                schedule_task(send_telegram_message(message))
+        else:
+            flag = 0  # Reset flag when humidity is back to normal
+    except Exception as e:
+        print(f"Error processing message: {e}")
+
 
 # Create a persistent event loop
 event_loop = asyncio.new_event_loop()
