@@ -39,6 +39,13 @@ TELEGRAM_CHAT_ID = get_chat_id()
 if TELEGRAM_CHAT_ID is None:
     print("Failed to fetch Telegram chat ID. Exiting...")
     exit(1)
+# Asynchronous function to send a Telegram message
+async def send_telegram_message(message):
+    try:
+        await bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
+        print("Notification sent to Telegram.")
+    except Exception as e:
+        print(f"Error sending message to Telegram: {e}")
 
 
 # Create a persistent event loop
