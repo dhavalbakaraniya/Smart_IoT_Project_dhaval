@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 import paho.mqtt.client as mqtt
 import threading
+from datetime import datetime
 
 app = FastAPI()
 
 # Global variable to store the latest moisture value
 latest_moisture_value = "No Data Yet"
+
+# Log list to store entries of low humidity detections
+low_humidity_log = []
 
 # MQTT Setup
 BROKER = "test.mosquitto.org"
@@ -15,7 +19,30 @@ def on_message(client, userdata, message):
     global latest_moisture_value
     latest_moisture_value = message.payload.decode()
 
+    # Convert to float instead of int for handling decimal values
+    if float(latest_moisture_value) <= 300:
+        log_entry = {
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "moisture_value": latest_moisture_value
+        }
+        low_humidity_log.append(log_entry)
+
 def mqtt_subscribe():
     client = mqtt.Client()
     client.on_message = on_message
-   
+    client.connect(BROKER, 1883, 60)
+    client.subscribe(TOPIC)
+    client.loop_forever()
+
+# Start MQTT in a separate thread
+mqtt_thread = threading.Thread(target=mqtt_subscribe)
+mqtt_thread.daemon = True
+mqtt_thread.start()
+
+@app.get("/humidity")
+def read_humidity():
+    return {"moisture_value": latest_moisture_value}
+
+@app.get("/low_humidity_log")
+def get_low_humidity_log():
+    return {"low_humidity_log": low_humidity_log}
