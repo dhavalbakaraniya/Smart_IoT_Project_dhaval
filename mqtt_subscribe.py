@@ -1,64 +1,84 @@
 import argparse
-import logging
-import os
-import signal
 import paho.mqtt.client as mqtt
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='MQTT to InfluxDB bridge.')
-    parser.add_argument('--url', type=str, default=os.getenv('INFLUXDB_URL', 'http://localhost:8086'), help='InfluxDB URL')
-    parser.add_argument('--bucket', type=str, default=os.getenv('INFLUXDB_BUCKET', 'iot'), help='InfluxDB bucket name')
-    parser.add_argument('--mqtt-broker', type=str, default=os.getenv('MQTT_BROKER', 'localhost'), help='MQTT broker address')
-    parser.add_argument('--mqtt-topic', type=str, default=os.getenv('MQTT_TOPIC', 'sensors'), help='MQTT topic to subscribe')
-    return parser.parse_args()
-
+# Callback function when a message is received from the MQTT broker
 def on_message(client, userdata, msg):
     try:
-        logging.info(f"Received message: {msg.payload.decode('utf-8')} on topic: {msg.topic}")
+        # Decode the payload and log it
+        payload = msg.payload.decode('utf-8')
+        print(f"Received message on topic {msg.topic}: {payload}")
 
-        # Filter messages for specific criteria (for example, topic-based filtering)
-        if msg.topic != userdata['expected_topic']:
-            logging.info(f"Ignored message from topic: {msg.topic}")
-            return
-        
-        # Prepare the data point for InfluxDB
-        payload = float(msg.payload.decode('utf-8'))
-        point = Point("sensor_data").field("value", payload)
+        # Parse the payload (assuming it's a simple value; adjust if JSON or other format)
+        humidity_value = float(payload)
 
-        # Write data to InfluxDB
-        write_api = userdata['write_api']
-        write_api.write(bucket=userdata['bucket'], record=point)
-        logging.info("Data written to InfluxDB.")
+        # Create a data point
+        point = Point("sensor1") \
+            .field("measuring", humidity_value) \
+            .tag("type", "moisture")
+
+        # Write to InfluxDB
+        userdata['write_api'].write(bucket=userdata['bucket'], record=point)
+        print("Data written to InfluxDB successfully.")
+
+        # Increment the message count
+        userdata['message_count'] += 1
+        if userdata['message_count'] >= userdata['max_messages']:
+            print("Processed the maximum number of messages. Stopping.")
+            client.disconnect()  # Disconnect the MQTT client
     except Exception as e:
-        logging.error(f"Error processing message: {e}")
+        print(f"Error processing message: {e}")
 
-def main(url, bucket, mqtt_broker, mqtt_topic):
-    client = InfluxDBClient(url=url)
+def main(url, org, bucket, token, mqtt_broker, mqtt_port, mqtt_topic, max_messages):
+    # Create the InfluxDB client
+    client = InfluxDBClient(url=url, token=token, org=org)
     write_api = client.write_api(write_options=SYNCHRONOUS)
 
-    mqtt_client = mqtt.Client(userdata={"write_api": write_api, "bucket": bucket, "expected_topic": mqtt_topic})
+    # Configure MQTT client
+    mqtt_client = mqtt.Client(userdata={"write_api": write_api, "bucket": bucket, "message_count": 0, "max_messages": max_messages})
     mqtt_client.on_message = on_message
 
-    def signal_handler(sig, frame):
-        logging.info('Gracefully shutting down...')
-        mqtt_client.disconnect()
+    # Connect to the MQTT broker
+    print(f"Connecting to MQTT broker {mqtt_broker}:{mqtt_port}...")
+    mqtt_client.connect(mqtt_broker, mqtt_port, 60)
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-    logging.info(f"Connecting to MQTT broker {mqtt_broker}...")
-    mqtt_client.connect(mqtt_broker)
-
-    logging.info(f"Subscribing to topic {mqtt_topic}...")
+    # Subscribe to the MQTT topic
+    print(f"Subscribing to topic {mqtt_topic}...")
     mqtt_client.subscribe(mqtt_topic)
 
+    # Start MQTT loop (blocks until stopped)
     mqtt_client.loop_forever()
 
-if __name__ == "__main__":
+    # Cleanup
+    client.close()
+    print("InfluxDB client closed.")
+
+def parse_args():
+    """Parse the args."""
+    parser = argparse.ArgumentParser(description='MQTT to InfluxDB bridge.')
+    parser.add_argument('--url', type=str, required=False,
+                        default='https://us-east-1-1.aws.cloud2.influxdata.com',
+                        help='InfluxDB hostname INCLUDING port for local installations')
+    parser.add_argument('--bucket', type=str, required=False, default='smart-iot',
+                        help='InfluxDB bucket to use for writing data')
+    parser.add_argument('--org', type=str, required=False, default='smart-iot',
+                        help='Organization name as configured in InfluxDB UI')
+    parser.add_argument('--token', type=str, required=False,
+                        default='11jFHQgTnbF7zT3aqHiAbMVMMnBR_E0W3alzu4lSYU_a-prnLLL8Ey7YnQNkfVNCG6hH59f0DbB82Eum-lot5w==',
+                        help='InfluxDB API token generated in the InfluxDB UI')
+    parser.add_argument('--mqtt-broker', type=str, required=False,
+                        default='test.mosquitto.org',
+                        help='MQTT broker hostname or IP address')
+    parser.add_argument('--mqtt-port', type=int, required=False, default=1883,
+                        help='MQTT broker port')
+    parser.add_argument('--mqtt-topic', type=str, required=False, default='dar_val',
+                        help='MQTT topic to subscribe to')
+    parser.add_argument('--max-messages', type=int, required=False, default=25,
+                        help='Number of messages to process before stopping')
+    return parser.parse_args()
+
+if __name__ == '__main__':
     args = parse_args()
-    main(args.url, args.bucket, args.mqtt_broker, args.mqtt_topic)
+    main(url=args.url, org=args.org, bucket=args.bucket, token=args.token,
+         mqtt_broker=args.mqtt_broker, mqtt_port=args.mqtt_port, mqtt_topic=args.mqtt_topic, max_messages=args.max_messages)
