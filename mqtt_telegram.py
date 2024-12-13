@@ -79,5 +79,11 @@ def on_message(client, userdata, msg):
 
 
 # Create a persistent event loop
-event_loop = asyncio.new_event_loop()
-asyncio.set_event_loop(event_loop)
+client = mqtt.Client(protocol=mqtt.MQTTv311)  # Use explicit protocol version
+client.on_connect = on_connect
+client.on_message = on_message
+
+# Start the event loop in a background thread
+loop_thread = threading.Thread(target=event_loop.run_forever, daemon=True)
+loop_thread.start()
+
