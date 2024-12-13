@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 import paho.mqtt.client as mqtt
 import threading
 from datetime import datetime
@@ -46,3 +47,9 @@ def read_humidity():
 @app.get("/low_humidity_log")
 def get_low_humidity_log():
     return {"low_humidity_log": low_humidity_log}
+
+# Serve the index.html file
+@app.get("/", response_class=HTMLResponse)
+def get_index():
+    with open("templates/index.html", "r") as file:
+        return HTMLResponse(content=file.read())
