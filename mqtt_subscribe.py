@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import paho.mqtt.client as mqtt
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -9,15 +10,20 @@ logging.basicConfig(level=logging.INFO)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='MQTT to InfluxDB bridge.')
-    parser.add_argument('--url', type=str, default='http://localhost:8086', help='InfluxDB URL')
-    parser.add_argument('--bucket', type=str, default='iot', help='InfluxDB bucket name')
-    parser.add_argument('--mqtt-broker', type=str, default='localhost', help='MQTT broker address')
-    parser.add_argument('--mqtt-topic', type=str, default='sensors', help='MQTT topic to subscribe')
+    parser.add_argument('--url', type=str, default=os.getenv('INFLUXDB_URL', 'http://localhost:8086'), help='InfluxDB URL')
+    parser.add_argument('--bucket', type=str, default=os.getenv('INFLUXDB_BUCKET', 'iot'), help='InfluxDB bucket name')
+    parser.add_argument('--mqtt-broker', type=str, default=os.getenv('MQTT_BROKER', 'localhost'), help='MQTT broker address')
+    parser.add_argument('--mqtt-topic', type=str, default=os.getenv('MQTT_TOPIC', 'sensors'), help='MQTT topic to subscribe')
     return parser.parse_args()
 
 def on_message(client, userdata, msg):
     try:
         logging.info(f"Received message: {msg.payload.decode('utf-8')} on topic: {msg.topic}")
+
+        # Filter messages for specific criteria (for example, topic-based filtering)
+        if msg.topic != userdata['expected_topic']:
+            logging.info(f"Ignored message from topic: {msg.topic}")
+            return
         
         # Prepare the data point for InfluxDB
         payload = float(msg.payload.decode('utf-8'))
@@ -34,7 +40,7 @@ def main(url, bucket, mqtt_broker, mqtt_topic):
     client = InfluxDBClient(url=url)
     write_api = client.write_api(write_options=SYNCHRONOUS)
 
-    mqtt_client = mqtt.Client(userdata={"write_api": write_api, "bucket": bucket})
+    mqtt_client = mqtt.Client(userdata={"write_api": write_api, "bucket": bucket, "expected_topic": mqtt_topic})
     mqtt_client.on_message = on_message
 
     logging.info(f"Connecting to MQTT broker {mqtt_broker}...")
