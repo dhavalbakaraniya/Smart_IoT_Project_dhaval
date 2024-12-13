@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import signal
 import paho.mqtt.client as mqtt
 from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -42,6 +43,13 @@ def main(url, bucket, mqtt_broker, mqtt_topic):
 
     mqtt_client = mqtt.Client(userdata={"write_api": write_api, "bucket": bucket, "expected_topic": mqtt_topic})
     mqtt_client.on_message = on_message
+
+    def signal_handler(sig, frame):
+        logging.info('Gracefully shutting down...')
+        mqtt_client.disconnect()
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     logging.info(f"Connecting to MQTT broker {mqtt_broker}...")
     mqtt_client.connect(mqtt_broker)
