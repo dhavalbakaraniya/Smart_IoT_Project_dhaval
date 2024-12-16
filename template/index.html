@@ -38,5 +38,18 @@
         </table>
     </div>
     <footer>🌱 Powered by M5Stack & FastAPI</footer>
+    <script>
+        async function fetchHumidity() {
+            try {
+                const response = await fetch('/humidity');
+                const data = await response.json();
+                document.getElementById('humidity').innerText = ${data.moisture_value} %;
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        setInterval(fetchHumidity, 2000);
+    </script>
 </body>
 </html>
