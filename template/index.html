@@ -5,18 +5,110 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Real-Time Soil Moisture Monitor</title>
     <style>
+        /* Global Styling */
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
             margin: 0;
             padding: 0;
-            background-color: #f0f0f0;
+            font-family: 'Poppins', Arial, sans-serif;
+            background: linear-gradient(to bottom, #83a4d4, #b6fbff);
+            color: #333;
+            text-align: center;
+            overflow: hidden;
         }
-        footer {
+
+        /* Header */
+        h1 {
             margin-top: 20px;
-            font-size: 0.9em;
-            color: #555;
+            font-size: 2.8em;
+            color: #ffffff;
+            text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
         }
+
+        /* Container */
+        .container {
+            margin: 50px auto;
+            padding: 30px;
+            max-width: 500px;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.5s ease;
+        }
+
+        .container:hover {
+            transform: translateY(-10px);
+        }
+
+        /* Moisture Value */
+        #humidity {
+            font-size: 3.5em;
+            font-weight: bold;
+            color: #0078d7;
+            margin: 20px 0;
+            transition: all 0.5s ease;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* Status Message */
+        #status {
+            font-size: 1.2em;
+            margin-top: 10px;
+            color: #444;
+        }
+
+        /* Color for status */
+        .low {
+            color: #e74c3c;
+        }
+
+        .normal {
+            color: #2ecc71;
+        }
+
+        /* Log Table */
+        #log-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        #log-table th, #log-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+
+        #log-table th {
+            background-color: #0078d7;
+            color: white;
+        }
+
+        #log-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        /* Footer */
+        footer {
+            position: absolute;
+            bottom: 10px;
+            left: 0;
+            right: 0;
+            font-size: 0.9em;
+            color: #fff;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
     </style>
 </head>
 <body>
@@ -37,51 +129,76 @@
             </tbody>
         </table>
     </div>
-    <footer>🌱 Powered by M5Stack & FastAPI</footer>
+
+    <footer>🌱 Powered by M5Stack & FastAPI | Designed for Plants</footer>
+
     <script>
+        // Fetch and display the latest humidity value and log table
         async function fetchHumidity() {
-        try {
-            const response = await fetch('/humidity');
-            const data = await response.json();
-            const value = data.moisture_value;
-            document.getElementById('humidity').innerText = ${value} %;
+            try {
+                const response = await fetch('/humidity');
+                const data = await response.json();
+                const value = data.moisture_value;
 
-            // Update status
-            const status = document.getElementById('status');
-            if (value <= 300) {
-                status.innerText = '⚠️ Soil is Dry - Water Needed!';
-            } else {
-                status.innerText = '✅ Soil Moisture is Normal';
+                const display = document.getElementById('humidity');
+                const status = document.getElementById('status');
+
+                display.innerText = `${value} %`; // Update value
+
+                // Update styles based on value
+                if (parseInt(value) <= 300) {
+                    display.className = 'low';
+                    status.innerText = '⚠️ Soil is Dry - Water Needed!';
+                } else {
+                    display.className = 'normal';
+                    status.innerText = '✅ Soil Moisture is Normal';
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                document.getElementById('status').innerText = '❌ Error fetching data';
             }
-        } catch (error) {
-            console.error("Error fetching data:", error);
         }
-    }
 
-    async function fetchLowHumidityLogs() {
-        try {
-            const response = await fetch('/low_humidity_log');
-            const logs = await response.json();
-            const logTbody = document.getElementById('log-tbody');
-            logTbody.innerHTML = "";
+        // Fetch and update low humidity logs
+        async function fetchLowHumidityLogs() {
+            try {
+                const response = await fetch('/low_humidity_log');
+                const data = await response.json();
+                const logs = data.low_humidity_log;
+                const logTbody = document.getElementById('log-tbody');
 
-            logs.forEach(log => {
-                const row = document.createElement('tr');
-                const timestampCell = document.createElement('td');
-                const valueCell = document.createElement('td');
-                timestampCell.textContent = log.timestamp;
-                valueCell.textContent = log.moisture_value;
-                row.appendChild(timestampCell);
-                row.appendChild(valueCell);
-                logTbody.appendChild(row);
-            });
-        } catch (error) {
-            console.error("Error fetching logs:", error);
+                // Clear existing log entries
+                logTbody.innerHTML = "";
+
+                // If no logs, show a placeholder
+                if (logs.length === 0) {
+                    logTbody.innerHTML = "<tr><td colspan='2'>No low humidity detected yet.</td></tr>";
+                } else {
+                    logs.forEach(log => {
+                        const row = document.createElement('tr');
+                        const timestampCell = document.createElement('td');
+                        const valueCell = document.createElement('td');
+                        timestampCell.textContent = log.timestamp;
+                        valueCell.textContent = log.moisture_value;
+                        row.appendChild(timestampCell);
+                        row.appendChild(valueCell);
+                        logTbody.appendChild(row);
+                    });
+                }
+            } catch (error) {
+                console.error("Error fetching log data:", error);
+            }
         }
-    }
 
-    setInterval(fetchLowHumidityLogs, 2000);
-        setInterval(fetchHumidity, 2000);
+        // Fetch data every 2 seconds
+        setInterval(() => {
+            fetchHumidity();
+            fetchLowHumidityLogs();
+        }, 2000);
+
+        // Initial fetch on page load
+        fetchHumidity();
+        fetchLowHumidityLogs();
     </script>
 </body>
 </html>
