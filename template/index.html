@@ -58,8 +58,29 @@
         }
     }
 
-    setInterval(fetchHumidity, 2000);
+    async function fetchLowHumidityLogs() {
+        try {
+            const response = await fetch('/low_humidity_log');
+            const logs = await response.json();
+            const logTbody = document.getElementById('log-tbody');
+            logTbody.innerHTML = "";
 
+            logs.forEach(log => {
+                const row = document.createElement('tr');
+                const timestampCell = document.createElement('td');
+                const valueCell = document.createElement('td');
+                timestampCell.textContent = log.timestamp;
+                valueCell.textContent = log.moisture_value;
+                row.appendChild(timestampCell);
+                row.appendChild(valueCell);
+                logTbody.appendChild(row);
+            });
+        } catch (error) {
+            console.error("Error fetching logs:", error);
+        }
+    }
+
+    setInterval(fetchLowHumidityLogs, 2000);
         setInterval(fetchHumidity, 2000);
     </script>
 </body>
